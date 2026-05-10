@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────
+#  Camel Route: Kafka XML → extract text → write to text file
+# ─────────────────────────────────────────────────────────────
+#
+#  Expected XML message format:
+#    <message>
+#      <content>Hello from Apache Camel via Kafka!</content>
+#      <timestamp>2026-05-10</timestamp>
+#    </message>
+#
+#  The XPath expression extracts the concatenated text of all
+#  child elements so the saved file contains only plain text.
+# ─────────────────────────────────────────────────────────────
+
+- route:
+    id: kafka-xml-to-file
+    from:
+      uri: "kafka:xml-topic"
+      parameters:
+        brokers: "{{kafka.brokers}}"       # resolved from application.properties
+        groupId: "camel-demo-group"
+        autoOffsetReset: "earliest"        # also consume messages sent before startup
+    steps:
+      - log:
+          message: "Received XML from Kafka: ${body}"
+          loggingLevel: "INFO"
+
+      # Extract all text content from the XML body via XPath
+      - setBody:
+          expression:
+            xpath: "string(//message)"     # returns all child text nodes concatenated
+
+      - log:
+          message: "Extracted text: ${body}"
+          loggingLevel: "INFO"
+
+      # Write the extracted text to a uniquely named .txt file
+      - to:
+          uri: "file:{{output.dir}}"       # resolved from application.properties
+          parameters:
+            fileName: "message-${date:now:yyyyMMdd-HHmmss-SSS}.txt"
+            charset: "UTF-8"
