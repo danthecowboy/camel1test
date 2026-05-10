@@ -53,6 +53,12 @@
             <groupId>org.apache.camel</groupId>
             <artifactId>camel-file</artifactId>
         </dependency>
+        <!-- Logging backend — without this, ALL Camel log output is silently discarded -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.13</version>
+        </dependency>
     </dependencies>
 
     <build>

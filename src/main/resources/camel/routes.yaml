@@ -7,27 +7,28 @@
 #      <content>Hello from Apache Camel via Kafka!</content>
 #      <timestamp>2026-05-10</timestamp>
 #    </message>
-#
-#  The XPath expression extracts the concatenated text of all
-#  child elements so the saved file contains only plain text.
 # ─────────────────────────────────────────────────────────────
 
 # In Camel 4.x YAML DSL, `steps` lives inside `from`, not next to it.
 - from:
     uri: "kafka:xml-topic"
     parameters:
-      brokers: "{{kafka.brokers}}"       # resolved from application.properties
+      brokers: "{{kafka.brokers}}"
       groupId: "camel-demo-group"
-      autoOffsetReset: "earliest"        # also consume messages sent before startup
+      autoOffsetReset: "earliest"
     steps:
       - log:
           message: "Received XML from Kafka: ${body}"
           loggingLevel: "INFO"
 
-      # Extract all text content from the XML body via XPath
+      # Extract all text content from the XML body via XPath.
+      # resultType is required — without it Camel expects a NodeList
+      # and throws an error when string() returns a String.
       - setBody:
           expression:
-            xpath: "string(//message)"   # returns all child text nodes concatenated
+            xpath:
+              expression: "string(//message)"
+              resultType: "java.lang.String"
 
       - log:
           message: "Extracted text: ${body}"
