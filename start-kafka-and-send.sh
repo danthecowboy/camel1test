@@ -3,6 +3,7 @@
 #  start-kafka-and-send.sh
 #
 #  1. Starts a single-node Kafka broker (KRaft, no Zookeeper)
+#     using the official apache/kafka image
 #  2. Creates the topic "xml-topic"
 #  3. Sends a sample XML message
 #  4. Prints instructions to run the Camel app
@@ -13,7 +14,8 @@ set -euo pipefail
 
 CONTAINER="kafka-camel-demo"
 TOPIC="xml-topic"
-IMAGE="bitnami/kafka:3.7"
+IMAGE="apache/kafka:3.9.2"
+KAFKA_BIN="/opt/kafka/bin"
 
 # ── 1. Start Kafka ────────────────────────────────────────────
 echo "▶ Starting Kafka container..."
@@ -23,20 +25,24 @@ docker rm -f "$CONTAINER" 2>/dev/null || true
 docker run -d \
   --name "$CONTAINER" \
   -p 9092:9092 \
-  -e KAFKA_CFG_NODE_ID=0 \
-  -e KAFKA_CFG_PROCESS_ROLES=controller,broker \
-  -e KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
-  -e KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
-  -e KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
-  -e KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@localhost:9093 \
-  -e KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER \
-  -e ALLOW_PLAINTEXT_LISTENER=yes \
+  -e KAFKA_NODE_ID=1 \
+  -e KAFKA_PROCESS_ROLES=broker,controller \
+  -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
+  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
+  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+  -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
+  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+  -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+  -e KAFKA_LOG_DIRS=/tmp/kraft-combined-logs \
+  -e CLUSTER_ID=5L6g3nShT-eMCtK--X86sw \
   "$IMAGE"
 
 # ── 2. Wait until Kafka is ready ──────────────────────────────
 echo -n "⏳ Waiting for Kafka to be ready"
-until docker exec "$CONTAINER" kafka-topics.sh \
-        --bootstrap-server localhost:9092 --list &>/dev/null; do
+until docker exec "$CONTAINER" \
+        "$KAFKA_BIN/kafka-topics.sh" --bootstrap-server localhost:9092 --list &>/dev/null; do
   echo -n "."
   sleep 2
 done
@@ -44,7 +50,7 @@ echo " ready!"
 
 # ── 3. Create topic ───────────────────────────────────────────
 echo "▶ Creating topic '${TOPIC}'..."
-docker exec "$CONTAINER" kafka-topics.sh \
+docker exec "$CONTAINER" "$KAFKA_BIN/kafka-topics.sh" \
   --bootstrap-server localhost:9092 \
   --create \
   --topic "$TOPIC" \
@@ -57,8 +63,8 @@ XML_MESSAGE='<?xml version="1.0" encoding="UTF-8"?><message><content>Hello from 
 
 echo "▶ Sending XML message to topic '${TOPIC}'..."
 echo "$XML_MESSAGE" | docker exec -i "$CONTAINER" \
-  kafka-console-producer.sh \
-  --broker-list localhost:9092 \
+  "$KAFKA_BIN/kafka-console-producer.sh" \
+  --bootstrap-server localhost:9092 \
   --topic "$TOPIC"
 
 echo ""
